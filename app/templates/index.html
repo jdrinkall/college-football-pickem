@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="flex items-end gap-4 mb-6">
+    <form method="get" class="flex items-end gap-2">
+      <div>
+        <label class="block text-sm text-gray-600">Season</label>
+        <input name="year" value="{{ season }}" class="border rounded px-3 py-2 w-28" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-600">Conference</label>
+        <select name="conference" class="border rounded px-3 py-2">
+          <option value="">All</option>
+          {% for conf in conferences %}
+            <option value="{{ conf }}" {% if conf == selected_conference %}selected{% endif %}>{{ conf }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="bg-blue-600 text-white px-4 py-2 rounded">Filter</button>
+      <a href="/" class="text-sm underline">Reset</a>
+    </form>
+    <form method="post" action="/admin/refresh" onsubmit="return refreshNow(event)" class="ml-auto">
+      <input type="hidden" name="year" value="{{ season }}" />
+      <button class="border px-3 py-2 rounded">🔄 Refresh {{ season }}</button>
+    </form>
+  </div>
+
+      <div class="mb-8">
+    <h2 class="text-xl font-bold mb-2">Selected Teams by Individual</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {% for name, teams in individuals.items() %}
+        <div class="bg-gray-100 rounded p-4 shadow">
+          <div class="font-semibold mb-2">
+            {{ name }}
+            <span class="ml-2 text-blue-700 text-sm font-normal">
+              (Total Wins: {{ individual_wins[name] }})
+            </span>
+          </div>
+          <ul class="list-disc ml-6">
+            {% for team in teams %}
+              <li>{{ team }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="overflow-x-auto bg-white rounded-xl shadow">
+    <table class="min-w-full table-auto">
+      <thead class="bg-gray-100 text-left">
+        <tr>
+          <th class="px-4 py-3">Team</th>
+          <th class="px-4 py-3">Conf</th>
+          <th class="px-4 py-3">W</th>
+          <th class="px-4 py-3">L</th>
+          <th class="px-4 py-3">T</th>
+          <th class="px-4 py-3">Games</th>
+          <th class="px-4 py-3">Last Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr class="border-t">
+          <td class="px-4 py-2 font-medium">{{ r.team }}</td>
+          <td class="px-4 py-2">{{ r.conference or '-' }}</td>
+          <td class="px-4 py-2">{{ r.wins }}</td>
+          <td class="px-4 py-2">{{ r.losses }}</td>
+          <td class="px-4 py-2">{{ r.ties }}</td>
+          <td class="px-4 py-2">{{ r.total_games }}</td>
+          <td class="px-4 py-2 text-sm text-gray-500">{{ r.last_updated.strftime('%Y-%m-%d %H:%M') if r.last_updated else '-' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not records %}
+        <tr><td colspan="7" class="px-4 py-6 text-center text-gray-500">No records cached yet for {{ season }}. Try the refresh button.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    async function refreshNow(e) {
+      e.preventDefault();
+      const form = e.target;
+      const data = new FormData(form);
+      const params = new URLSearchParams();
+      if (data.get('year')) params.set('year', data.get('year'));
+      const res = await fetch('/admin/refresh?' + params.toString(), { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({detail:'Unknown error'}));
+        alert('Refresh failed: ' + (err.detail || res.status));
+      } else {
+        location.reload();
+      }
+      return false;
+    }
+  </script>
+{% endblock %}
