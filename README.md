@@ -10,7 +10,8 @@ Stores results in SQLite and serves a simple Tailwind UI.
 cd cfb_wins_app
 
 # 2) Create a virtualenv (recommended)
-python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m venv .venv 
+.venv\Scripts\activate
 
 # 3) Install deps
 pip install -r requirements.txt
@@ -20,7 +21,7 @@ cp .env.example .env
 # edit .env and set CFBD_API_KEY from https://collegefootballdata.com (free key)
 
 # 5) Run
-uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload
 
 # 6) Open
 # http://127.0.0.1:8000
