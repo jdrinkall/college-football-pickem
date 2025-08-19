@@ -32,12 +32,15 @@
           <div class="font-semibold mb-2">
             {{ name }}
             <span class="ml-2 text-blue-700 text-sm font-normal">
-              (Total Wins: {{ individual_wins[name] }})
+              (Wins: {{ individual_wins[name] }} • Points For: {{ individual_points[name] }})
             </span>
           </div>
           <ul class="list-disc ml-6">
             {% for team in teams %}
-              <li>{{ team }}</li>
+              <li>
+                {{ team }}
+                <span class="text-gray-600 text-sm">– {{ team_points.get(team, 0) }}</span>
+              </li>
             {% endfor %}
           </ul>
         </div>
@@ -45,37 +48,46 @@
     </div>
   </div>
 
-  <div class="overflow-x-auto bg-white rounded-xl shadow">
-    <table class="min-w-full table-auto">
-      <thead class="bg-gray-100 text-left">
-        <tr>
-          <th class="px-4 py-3">Team</th>
-          <th class="px-4 py-3">Conf</th>
-          <th class="px-4 py-3">W</th>
-          <th class="px-4 py-3">L</th>
-          <th class="px-4 py-3">T</th>
-          <th class="px-4 py-3">Games</th>
-          <th class="px-4 py-3">Last Updated</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in records %}
-        <tr class="border-t">
-          <td class="px-4 py-2 font-medium">{{ r.team }}</td>
-          <td class="px-4 py-2">{{ r.conference or '-' }}</td>
-          <td class="px-4 py-2">{{ r.wins }}</td>
-          <td class="px-4 py-2">{{ r.losses }}</td>
-          <td class="px-4 py-2">{{ r.ties }}</td>
-          <td class="px-4 py-2">{{ r.total_games }}</td>
-          <td class="px-4 py-2 text-sm text-gray-500">{{ r.last_updated.strftime('%Y-%m-%d %H:%M') if r.last_updated else '-' }}</td>
-        </tr>
-        {% endfor %}
-        {% if not records %}
-        <tr><td colspan="7" class="px-4 py-6 text-center text-gray-500">No records cached yet for {{ season }}. Try the refresh button.</td></tr>
-        {% endif %}
-      </tbody>
-    </table>
-  </div>
+<div class="overflow-x-auto bg-white rounded-xl shadow">
+  <table class="min-w-full table-auto">
+    <thead class="bg-gray-100 text-left">
+      <tr>
+        <th class="px-4 py-3">Team</th>
+        <th class="px-4 py-3">Conf</th>
+        <th class="px-4 py-3">W</th>
+        <th class="px-4 py-3">L</th>
+        <th class="px-4 py-3">T</th>
+        <th class="px-4 py-3">Games</th>
+        <th class="px-4 py-3">Last Updated</th>
+        <th class="px-4 py-3">Points For</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in records %}
+      <tr class="border-t">
+        <td class="px-4 py-2 font-medium">{{ r.team }}</td>
+        <td class="px-4 py-2">{{ r.conference or '-' }}</td>
+        <td class="px-4 py-2">{{ r.wins }}</td>
+        <td class="px-4 py-2">{{ r.losses }}</td>
+        <td class="px-4 py-2">{{ r.ties }}</td>
+        <td class="px-4 py-2">{{ r.total_games }}</td>
+        <td class="px-4 py-2 text-sm text-gray-500">
+          {{ r.last_updated.strftime('%Y-%m-%d %H:%M') if r.last_updated else '-' }}
+        </td>
+        <td class="px-4 py-2">{{ r.points_for }}</td>
+      </tr>
+      {% endfor %}
+      {% if not records %}
+      <tr>
+        <td colspan="8" class="px-4 py-6 text-center text-gray-500">
+          No records cached yet for {{ season }}. Try the refresh button.
+        </td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
 
   <script>
     async function refreshNow(e) {

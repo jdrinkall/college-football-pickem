@@ -1,7 +1,7 @@
 SELECTED_TEAMS = {
     "Sean": [
         "Ohio State",
-        "Miami (FL)",
+        "Miami",
         "LSU",
         "Navy",
         "Army",
@@ -12,7 +12,7 @@ SELECTED_TEAMS = {
         "Kansas State",
         "Louisiana",
         "Utah",
-        "ECU",
+        "East Carolina",
         "Western Kentucky",
     ],
     "Justin": [
@@ -50,7 +50,7 @@ SELECTED_TEAMS = {
     "Austin": [
         "Toledo",
         "Alabama",
-        "San Jose State",
+        "San José State",
         "Iowa State",
         "Florida",
         "Baylor",

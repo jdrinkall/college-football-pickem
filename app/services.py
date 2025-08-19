@@ -56,3 +56,31 @@ async def refresh_season(season: int) -> int:
     data = await fetch_team_records(season)
     with SessionLocal() as s:
         return upsert_records(s, season, data)
+
+from .cfbd_client import fetch_team_games
+import asyncio
+
+async def compute_points_for(season: int, teams: list[str]) -> dict[str, int]:
+    """Compute total points scored for each team in a season by summing game points."""
+    async def team_pf(team: str) -> tuple[str, int]:
+        games = await fetch_team_games(season, team)
+        pf = 0
+        for g in games:
+            # Each game has home/away info; add the points for the side that matches 'team'
+            home = g.get("home_team") or g.get("homeTeam")
+            away = g.get("away_team") or g.get("awayTeam")
+            home_p = g.get("home_points") or g.get("homePoints") or 0
+            away_p = g.get("away_points") or g.get("awayPoints") or 0
+            if isinstance(home_p, str):
+                try: home_p = int(home_p)
+                except: home_p = 0
+            if isinstance(away_p, str):
+                try: away_p = int(away_p)
+                except: away_p = 0
+            if team == home:
+                pf += home_p or 0
+            elif team == away:
+                pf += away_p or 0
+        return (team, int(pf))
+    results = await asyncio.gather(*(team_pf(t) for t in teams))
+    return dict(results)
