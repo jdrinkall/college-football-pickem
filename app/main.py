@@ -1,5 +1,5 @@
-import secrets
 from __future__ import annotations
+import secrets
 import os
 from datetime import datetime, time
 from typing import Optional
