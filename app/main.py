@@ -1,3 +1,4 @@
+import secrets
 from __future__ import annotations
 import os
 from datetime import datetime, time
@@ -145,3 +146,15 @@ async def admin_refresh(year: Optional[int] = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"updated": count, "season": season}
+
+
+REFRESH_TOKEN = os.getenv("REFRESH_TOKEN")
+
+@app.post("/admin/refresh_token")
+async def admin_refresh_token(token: str, year: int | None = None):
+    if not REFRESH_TOKEN or not secrets.compare_digest(token, REFRESH_TOKEN):
+        raise HTTPException(status_code=403, detail="forbidden")
+    season = year if year else (int(os.getenv("SEASON_YEAR", "2025")))
+    count = await refresh_season(season)
+    return {"updated": count, "season": season}
+

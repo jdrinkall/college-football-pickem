@@ -7,3 +7,7 @@ pydantic-settings==2.4.0
 python-dotenv==1.0.1
 Jinja2==3.1.4
 apscheduler==3.10.4
+uvicorn
+sqlalchemy
+jinja2
+python-multipart
