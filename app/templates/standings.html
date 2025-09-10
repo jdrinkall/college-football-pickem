@@ -1,0 +1,36 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">Standings</h1>
+  <p class="text-sm text-gray-600">Sorted by wins (desc). Showing wins, losses, total games, and points scored.</p>
+</div>
+
+<div class="overflow-x-auto bg-white rounded-xl shadow">
+  <table class="min-w-full table-auto">
+    <thead class="bg-gray-100 text-left">
+      <tr>
+        <th class="px-4 py-3">Player</th>
+        <th class="px-4 py-3">Wins</th>
+        <th class="px-4 py-3">Losses</th>
+        <th class="px-4 py-3">Games</th>
+        <th class="px-4 py-3">Points For</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in standings %}
+      <tr class="border-t">
+        <td class="px-4 py-2 font-medium">{{ row.name }}</td>
+        <td class="px-4 py-2">{{ row.wins }}</td>
+        <td class="px-4 py-2">{{ row.losses }}</td>
+        <td class="px-4 py-2">{{ row.games }}</td>
+        <td class="px-4 py-2">{{ row.points_for }}</td>
+      </tr>
+      {% endfor %}
+      {% if not standings %}
+      <tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">No data yet. Try refreshing the season on the Home tab.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
