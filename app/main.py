@@ -158,3 +158,23 @@ async def admin_refresh_token(token: str, year: int | None = None):
     count = await refresh_season(season)
     return {"updated": count, "season": season}
 
+@app.get("/standings", response_class=HTMLResponse)
+async def standings(request: Request, year: Optional[int] = None, db: Session = Depends(get_db)):
+    season = int(year) if year else current_season()
+    q = select(TeamRecord).where(
+        TeamRecord.season == season,
+        TeamRecord.team.in_(ALL_SELECTED_TEAMS)
+    )
+    rows = db.execute(q).scalars().all()
+    team_agg = {r.team: {"wins": r.wins, "losses": r.losses, "games": r.total_games} for r in rows}
+    teams = list(team_agg.keys())
+    pf_map = await compute_points_for(season, teams)
+    standings = []
+    for name, team_list in SELECTED_TEAMS.items():
+        wins = sum(team_agg.get(t, {}).get("wins", 0) for t in team_list)
+        losses = sum(team_agg.get(t, {}).get("losses", 0) for t in team_list)
+        games = sum(team_agg.get(t, {}).get("games", 0) for t in team_list)
+        points_for = sum(pf_map.get(t, 0) for t in team_list)
+        standings.append({"name": name, "wins": wins, "losses": losses, "games": games, "points_for": points_for})
+    standings.sort(key=lambda x: (-x["wins"], -x["points_for"], x["name"]))
+    return templates.TemplateResponse("standings.html", {"request": request, "season": season, "standings": standings})
