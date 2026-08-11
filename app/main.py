@@ -14,8 +14,15 @@ from sqlalchemy import select
 from .db import SessionLocal
 from .models import TeamRecord
 from .schemas import TeamRecordOut  # kept in case you use elsewhere
-from .services import refresh_season, compute_points_for
-from .selected_teams import SELECTED_TEAMS, ALL_SELECTED_TEAMS
+from .services import refresh_season, compute_points_for, season_records
+from .selected_teams import (
+    SEASONS,
+    LATEST_SEASON,
+    picks_for,
+    teams_for,
+    all_players,
+    played_seasons,
+)
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -30,8 +37,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
-# Only allow these seasons, per your scope
-ALLOWED_SEASONS = [2024, 2025]
+# Seasons come from the draft data — adding a season to selected_teams.py is enough.
+ALLOWED_SEASONS = SEASONS
 
 def get_db():
     db = SessionLocal()
@@ -40,21 +47,28 @@ def get_db():
     finally:
         db.close()
 
+def resolve_season(year: Optional[int]) -> int:
+    """Clamp a requested season to one we actually have a draft for."""
+    if year and int(year) in ALLOWED_SEASONS:
+        return int(year)
+    return current_season()
+
 def current_season() -> int:
     env_year = os.getenv("SEASON_YEAR")
     if env_year:
         try:
             y = int(env_year)
-            return y if y in ALLOWED_SEASONS else max(ALLOWED_SEASONS)
+            return y if y in ALLOWED_SEASONS else LATEST_SEASON
         except ValueError:
             pass
     y = datetime.today().year
-    return y if y in ALLOWED_SEASONS else max(ALLOWED_SEASONS)
+    return y if y in ALLOWED_SEASONS else LATEST_SEASON
 
 async def scheduled_refresh():
     """Daily refresh job. Swallows errors so a bad run doesn't kill the scheduler."""
+    season = current_season()
     try:
-        count = await refresh_season(current_season())
+        count = await refresh_season(season, teams_for(season))
         print(f"Scheduled refresh wrote {count} rows")
     except Exception as e:
         print(f"Scheduled refresh failed: {e}")
@@ -85,75 +99,70 @@ async def index(
     conference: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    # Resolve and clamp season
-    season = int(year) if year else current_season()
-    if season not in ALLOWED_SEASONS:
-        season = max(ALLOWED_SEASONS)
+    season = resolve_season(year)
+    season_teams = teams_for(season)
+    season_picks = picks_for(season)
 
-    # Query only your selected teams
+    # Query only the teams drafted in this season
     q = select(TeamRecord).where(
         TeamRecord.season == season,
-        TeamRecord.team.in_(ALL_SELECTED_TEAMS),
+        TeamRecord.team.in_(season_teams),
     )
     if conference:
         q = q.where(TeamRecord.conference == conference)
     q = q.order_by(TeamRecord.wins.desc(), TeamRecord.losses, TeamRecord.team)
     rows = db.execute(q).scalars().all()
 
-    # ----- Points For: compute at render time -----
-    teams = [r.team for r in rows]  # already filtered to selected teams
-    pf_map = await compute_points_for(season, teams)
-    
+    # Points come from the DB, refreshed from CFBD only when missing or stale.
+    # Ask for every drafted team, not just the rows the conference filter left.
+    pf_map = await compute_points_for(season, season_teams)
+
     for r in rows:
         setattr(r, "points_for", pf_map.get(r.team, 0))
 
-    # Build totals by person (wins only, per your spec)
-    team_wins = {r.team: r.wins for r in rows}
+    # Totals by person, always against this season's picks
+    all_rows = db.execute(
+        select(TeamRecord).where(
+            TeamRecord.season == season,
+            TeamRecord.team.in_(season_teams),
+        )
+    ).scalars().all()
+    team_wins = {r.team: r.wins for r in all_rows}
     individual_wins = {
-        name: sum(team_wins.get(team, 0) for team in teams)
-        for name, teams in SELECTED_TEAMS.items()
+        name: sum(team_wins.get(team, 0) for team in team_list)
+        for name, team_list in season_picks.items()
     }
-    team_points = pf_map  # alias for clarity
     individual_points = {
-    name: sum(team_points.get(team, 0) for team in teams_list)
-    for name, teams_list in SELECTED_TEAMS.items()
+        name: sum(pf_map.get(team, 0) for team in team_list)
+        for name, team_list in season_picks.items()
     }
-    
 
     # Conference list for the filter dropdown
-    confs = sorted({
-        r.conference
-        for r in db.execute(
-            select(TeamRecord).where(
-                TeamRecord.season == season,
-                TeamRecord.team.in_(ALL_SELECTED_TEAMS),
-            )
-        ).scalars().all()
-        if r.conference
-    })
+    confs = sorted({r.conference for r in all_rows if r.conference})
 
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "season": season,
+            "seasons": ALLOWED_SEASONS,
             "records": rows,
             "conferences": confs,
             "selected_conference": conference or "",
-            "individuals": SELECTED_TEAMS,
+            "individuals": season_picks,
             "individual_wins": individual_wins,
             "individual_points": individual_points,
-            "team_points": team_points,
+            "team_points": pf_map,
+            "drafted": bool(season_teams),
         },
     )
 
 @app.post("/admin/refresh")
 async def admin_refresh(year: Optional[int] = None):
-    season = int(year) if year else current_season()
-    if season not in ALLOWED_SEASONS:
-        season = max(ALLOWED_SEASONS)
+    season = resolve_season(year)
     try:
-        count = await refresh_season(season)
+        # Explicit refresh also re-pulls points, so the button updates both columns
+        count = await refresh_season(season, teams_for(season))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"updated": count, "season": season}
@@ -165,27 +174,84 @@ REFRESH_TOKEN = os.getenv("REFRESH_TOKEN")
 async def admin_refresh_token(token: str, year: int | None = None):
     if not REFRESH_TOKEN or not secrets.compare_digest(token, REFRESH_TOKEN):
         raise HTTPException(status_code=403, detail="forbidden")
-    season = year if year else (int(os.getenv("SEASON_YEAR", "2025")))
-    count = await refresh_season(season)
+    season = resolve_season(year)
+    count = await refresh_season(season, teams_for(season))
     return {"updated": count, "season": season}
+
+async def season_standings(db: Session, season: int) -> list[dict]:
+    """Per-player totals for one season, best first."""
+    season_teams = teams_for(season)
+    team_agg = season_records(db, season, season_teams)
+    pf_map = await compute_points_for(season, season_teams)
+
+    table = []
+    for name, team_list in picks_for(season).items():
+        table.append({
+            "name": name,
+            "wins": sum(team_agg.get(t, {}).get("wins", 0) for t in team_list),
+            "losses": sum(team_agg.get(t, {}).get("losses", 0) for t in team_list),
+            "games": sum(team_agg.get(t, {}).get("games", 0) for t in team_list),
+            "points_for": sum(pf_map.get(t, 0) for t in team_list),
+        })
+    table.sort(key=lambda x: (-x["wins"], -x["points_for"], x["name"]))
+    return table
 
 @app.get("/standings", response_class=HTMLResponse)
 async def standings(request: Request, year: Optional[int] = None, db: Session = Depends(get_db)):
-    season = int(year) if year else current_season()
-    q = select(TeamRecord).where(
-        TeamRecord.season == season,
-        TeamRecord.team.in_(ALL_SELECTED_TEAMS)
+    season = resolve_season(year)
+    table = await season_standings(db, season)
+    return templates.TemplateResponse(
+        "standings.html",
+        {
+            "request": request,
+            "season": season,
+            "seasons": ALLOWED_SEASONS,
+            "standings": table,
+            "drafted": bool(teams_for(season)),
+        },
     )
-    rows = db.execute(q).scalars().all()
-    team_agg = {r.team: {"wins": r.wins, "losses": r.losses, "games": r.total_games} for r in rows}
-    teams = list(team_agg.keys())
-    pf_map = await compute_points_for(season, teams)
-    standings = []
-    for name, team_list in SELECTED_TEAMS.items():
-        wins = sum(team_agg.get(t, {}).get("wins", 0) for t in team_list)
-        losses = sum(team_agg.get(t, {}).get("losses", 0) for t in team_list)
-        games = sum(team_agg.get(t, {}).get("games", 0) for t in team_list)
-        points_for = sum(pf_map.get(t, 0) for t in team_list)
-        standings.append({"name": name, "wins": wins, "losses": losses, "games": games, "points_for": points_for})
-    standings.sort(key=lambda x: (-x["wins"], -x["points_for"], x["name"]))
-    return templates.TemplateResponse("standings.html", {"request": request, "season": season, "standings": standings})
+
+@app.get("/history", response_class=HTMLResponse)
+async def history(request: Request, db: Session = Depends(get_db)):
+    """Career totals across every season, plus each season's finish per player."""
+    # season -> {player: row}, and the finishing position within that season
+    by_season: dict[int, dict[str, dict]] = {}
+    for season in ALLOWED_SEASONS:
+        if not teams_for(season):
+            continue  # season not drafted yet — nothing to score
+        table = await season_standings(db, season)
+        by_season[season] = {
+            row["name"]: {**row, "place": place}
+            for place, row in enumerate(table, start=1)
+        }
+
+    careers = []
+    for player in all_players():
+        seasons_played = [s for s in played_seasons(player) if s in by_season]
+        rows = [by_season[s][player] for s in seasons_played if player in by_season[s]]
+        wins = sum(r["wins"] for r in rows)
+        losses = sum(r["losses"] for r in rows)
+        games = sum(r["games"] for r in rows)
+        careers.append({
+            "name": player,
+            "seasons": len(rows),
+            "wins": wins,
+            "losses": losses,
+            "games": games,
+            "points_for": sum(r["points_for"] for r in rows),
+            "titles": sum(1 for r in rows if r["place"] == 1),
+            # Win rate keeps players comparable when they haven't played the same seasons
+            "win_pct": (wins / games) if games else 0.0,
+            "by_season": {s: by_season[s][player] for s in seasons_played if player in by_season[s]},
+        })
+    careers.sort(key=lambda x: (-x["win_pct"], -x["wins"], x["name"]))
+
+    return templates.TemplateResponse(
+        "history.html",
+        {
+            "request": request,
+            "seasons": sorted(by_season),
+            "careers": careers,
+            "pending": [s for s in ALLOWED_SEASONS if not teams_for(s)],
+        },
+    )

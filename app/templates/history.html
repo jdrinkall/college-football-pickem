@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">All-Time History</h1>
+  <p class="text-sm text-gray-600">
+    Career totals across {{ seasons|length }} season{{ '' if seasons|length == 1 else 's' }}
+    ({{ seasons|join(', ') }}). Ranked by win rate, so players who joined later stay comparable.
+  </p>
+</div>
+
+{% if pending %}
+  <div class="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+    <span class="font-semibold">{{ pending|join(', ') }}</span>
+    {{ 'has' if pending|length == 1 else 'have' }} no draft recorded yet, so
+    {{ 'it is' if pending|length == 1 else 'they are' }} not counted below.
+  </div>
+{% endif %}
+
+<div class="overflow-x-auto bg-white rounded-xl shadow mb-8">
+  <table class="min-w-full table-auto">
+    <thead class="bg-gray-100 text-left">
+      <tr>
+        <th class="px-4 py-3">#</th>
+        <th class="px-4 py-3">Player</th>
+        <th class="px-4 py-3">Seasons</th>
+        <th class="px-4 py-3">W</th>
+        <th class="px-4 py-3">L</th>
+        <th class="px-4 py-3">Win %</th>
+        <th class="px-4 py-3">Points For</th>
+        <th class="px-4 py-3">Titles</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in careers %}
+      <tr class="border-t">
+        <td class="px-4 py-2 text-gray-500">{{ loop.index }}</td>
+        <td class="px-4 py-2 font-medium">{{ c.name }}</td>
+        <td class="px-4 py-2">{{ c.seasons }}</td>
+        <td class="px-4 py-2">{{ c.wins }}</td>
+        <td class="px-4 py-2">{{ c.losses }}</td>
+        <td class="px-4 py-2">{{ '%.3f'|format(c.win_pct) }}</td>
+        <td class="px-4 py-2">{{ c.points_for }}</td>
+        <td class="px-4 py-2">{{ '🏆' * c.titles }}{% if not c.titles %}<span class="text-gray-400">–</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      {% if not careers %}
+      <tr><td colspan="8" class="px-4 py-6 text-center text-gray-500">No completed drafts yet.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+{% if seasons %}
+<h2 class="text-xl font-bold mb-2">Season by Season</h2>
+<div class="overflow-x-auto bg-white rounded-xl shadow">
+  <table class="min-w-full table-auto">
+    <thead class="bg-gray-100 text-left">
+      <tr>
+        <th class="px-4 py-3">Player</th>
+        {% for s in seasons %}
+          <th class="px-4 py-3"><a href="/standings?year={{ s }}" class="underline">{{ s }}</a></th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in careers %}
+      <tr class="border-t">
+        <td class="px-4 py-2 font-medium">{{ c.name }}</td>
+        {% for s in seasons %}
+          {% set row = c.by_season.get(s) %}
+          <td class="px-4 py-2">
+            {% if row %}
+              <span class="{% if row.place == 1 %}font-bold{% endif %}">{{ row.wins }}-{{ row.losses }}</span>
+              <span class="text-gray-500 text-sm">({{ row.place }}{{ 'st' if row.place == 1 else 'nd' if row.place == 2 else 'rd' if row.place == 3 else 'th' }})</span>
+            {% else %}
+              <span class="text-gray-400">–</span>
+            {% endif %}
+          </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
