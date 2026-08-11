@@ -14,7 +14,15 @@ from sqlalchemy import select
 from .db import SessionLocal
 from .models import TeamRecord
 from .schemas import TeamRecordOut  # kept in case you use elsewhere
-from .services import refresh_season, compute_points_for, season_records
+from .services import (
+    refresh_season,
+    compute_points_for,
+    season_records,
+    ensure_lines,
+    parlay_season,
+    PARLAY_STAKE,
+    MONEYLINE_PROVIDERS,
+)
 from .selected_teams import (
     SEASONS,
     LATEST_SEASON,
@@ -207,6 +215,33 @@ async def standings(request: Request, year: Optional[int] = None, db: Session = 
             "season": season,
             "seasons": ALLOWED_SEASONS,
             "standings": table,
+            "drafted": bool(teams_for(season)),
+        },
+    )
+
+@app.get("/parlay", response_class=HTMLResponse)
+async def parlay(request: Request, year: Optional[int] = None, db: Session = Depends(get_db)):
+    """What a flat parlay on all of your teams, every week, would have returned."""
+    season = resolve_season(year)
+    season_picks = picks_for(season)
+
+    results = []
+    if teams_for(season):
+        await ensure_lines(season)
+        for name, team_list in season_picks.items():
+            summary = parlay_season(db, season, team_list)
+            results.append({"name": name, **summary})
+        results.sort(key=lambda r: -r["net"])
+
+    return templates.TemplateResponse(
+        "parlay.html",
+        {
+            "request": request,
+            "season": season,
+            "seasons": ALLOWED_SEASONS,
+            "results": results,
+            "stake": PARLAY_STAKE,
+            "book_order": MONEYLINE_PROVIDERS,
             "drafted": bool(teams_for(season)),
         },
     )
