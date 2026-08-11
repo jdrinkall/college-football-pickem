@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="mb-6 flex items-end justify-between gap-4 flex-wrap">
+  <div>
+    <h1 class="text-2xl font-bold">{{ season }} Parlay</h1>
+    <p class="text-sm text-gray-600">
+      A ${{ '%.0f'|format(stake) }} parlay every week on all of your teams to win.
+      Byes aren't legs. Regular season only.
+    </p>
+  </div>
+  <form method="get" class="flex items-end gap-2">
+    <div>
+      <label class="block text-sm text-gray-600">Season</label>
+      <select name="year" class="border rounded px-3 py-2">
+        {% for s in seasons %}
+          <option value="{{ s }}" {% if s == season %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="bg-blue-600 text-white px-4 py-2 rounded">Go</button>
+  </form>
+</div>
+
+{% if not drafted %}
+  <div class="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+    <span class="font-semibold">No draft recorded for {{ season }} yet.</span>
+    Payouts will appear once the picks are in.
+  </div>
+{% else %}
+
+<div class="overflow-x-auto bg-white rounded-xl shadow mb-4">
+  <table class="min-w-full table-auto">
+    <thead class="bg-gray-100 text-left">
+      <tr>
+        <th class="px-4 py-3">#</th>
+        <th class="px-4 py-3">Player</th>
+        <th class="px-4 py-3">Weeks Hit</th>
+        <th class="px-4 py-3">Staked</th>
+        <th class="px-4 py-3">Returned</th>
+        <th class="px-4 py-3">Net</th>
+        <th class="px-4 py-3">Best Week</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr class="border-t">
+        <td class="px-4 py-2 text-gray-500">{{ loop.index }}</td>
+        <td class="px-4 py-2 font-medium">{{ r.name }}</td>
+        <td class="px-4 py-2">{{ r.weeks_hit }} / {{ r.weeks_bet }}</td>
+        <td class="px-4 py-2 text-gray-600">${{ '%.2f'|format(r.staked) }}</td>
+        <td class="px-4 py-2">${{ '%.2f'|format(r.returned) }}</td>
+        <td class="px-4 py-2 font-semibold {% if r.net > 0 %}text-green-700{% elif r.net < 0 %}text-red-700{% endif %}">
+          {% if r.net >= 0 %}+{% else %}−{% endif %}${{ '%.2f'|format(r.net|abs) }}
+        </td>
+        <td class="px-4 py-2">
+          {% if r.best %}
+            <span class="font-medium">${{ '%.2f'|format(r.best.payout) }}</span>
+            <span class="text-gray-500 text-sm">wk {{ r.best.week }}</span>
+          {% else %}
+            <span class="text-gray-400">never hit</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<p class="text-sm text-gray-500 mb-8">
+  Priced at the first book to quote each game, in order: {{ book_order|join(' → ') }}.
+  Legs with no quoted moneyline are dropped and the rest of the week still runs; a week
+  with nothing quotable is skipped and nothing is staked.
+</p>
+
+<h2 class="text-xl font-bold mb-2">Week by Week</h2>
+<div class="space-y-2">
+  {% for r in results %}
+  <details class="bg-white rounded-xl shadow">
+    <summary class="cursor-pointer px-4 py-3 font-medium flex justify-between gap-4">
+      <span>{{ r.name }}</span>
+      <span class="{% if r.net > 0 %}text-green-700{% elif r.net < 0 %}text-red-700{% endif %}">
+        {% if r.net >= 0 %}+{% else %}−{% endif %}${{ '%.2f'|format(r.net|abs) }}
+        <span class="text-gray-500 font-normal text-sm">· {{ r.weeks_hit }}/{{ r.weeks_bet }} weeks</span>
+      </span>
+    </summary>
+    <div class="border-t px-4 py-3 overflow-x-auto">
+      <table class="min-w-full table-auto text-sm">
+        <thead class="text-left text-gray-600">
+          <tr>
+            <th class="py-2 pr-4">Wk</th>
+            <th class="py-2 pr-4">Legs</th>
+            <th class="py-2 pr-4">Odds</th>
+            <th class="py-2 pr-4">Result</th>
+            <th class="py-2 pr-4">Payout</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for w in r.weeks %}
+          <tr class="border-t">
+            <td class="py-2 pr-4 align-top">{{ w.week }}</td>
+            <td class="py-2 pr-4 align-top">
+              {% for leg in w.legs %}
+                <span class="{% if not leg.won %}text-red-700{% endif %}">
+                  {{ leg.team }} ({{ '+' if leg.moneyline > 0 else '' }}{{ leg.moneyline }})
+                </span>{% if not loop.last %}, {% endif %}
+              {% endfor %}
+              {% if w.dropped %}
+                <div class="text-gray-400 text-xs mt-1">no line: {{ w.dropped|join(', ') }}</div>
+              {% endif %}
+            </td>
+            <td class="py-2 pr-4 align-top whitespace-nowrap">{{ '%.2f'|format(w.multiplier) }}×</td>
+            <td class="py-2 pr-4 align-top">
+              {% if w.hit %}
+                <span class="text-green-700 font-medium">hit</span>
+              {% else %}
+                <span class="text-gray-500">miss</span>
+              {% endif %}
+            </td>
+            <td class="py-2 pr-4 align-top">
+              {% if w.hit %}${{ '%.2f'|format(w.payout) }}{% else %}<span class="text-gray-400">—</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

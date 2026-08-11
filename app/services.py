@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
-from .models import Base, TeamRecord, TeamPoints
+from .models import Base, TeamRecord, TeamPoints, GameLine
 from .db import engine, SessionLocal
-from .cfbd_client import fetch_team_records, fetch_team_games
+from .cfbd_client import fetch_team_records, fetch_team_games, fetch_lines
 
 # Create tables on import
 Base.metadata.create_all(bind=engine)
@@ -64,6 +64,7 @@ async def refresh_season(season: int, teams: Optional[List[str]] = None) -> int:
         written = upsert_records(s, season, data)
     if teams:
         await compute_points_for(season, teams, refresh=True)
+        await refresh_lines(season)  # one call; keeps the parlay page warm
     return written
 
 # How long a *live* season's stored points stay usable before we re-fetch. Finished
@@ -178,6 +179,159 @@ async def compute_points_for(
     return {
         team: fetched.get(team, stored.get(team, (0, None))[0])
         for team in teams
+    }
+
+# ---------------------------------------------------------------------------
+# Parlay: a flat stake each week on every one of a player's teams to win.
+# ---------------------------------------------------------------------------
+
+# Books disagree on the same game, so pick one and stay with it all season —
+# that's what actually betting a single book would have looked like. Falls
+# through in order when a book hasn't priced a game.
+MONEYLINE_PROVIDERS = [
+    p.strip()
+    for p in os.getenv("MONEYLINE_PROVIDERS", "DraftKings,ESPN Bet,Bovada").split(",")
+    if p.strip()
+]
+PARLAY_STAKE = float(os.getenv("PARLAY_STAKE", "10"))
+
+def _pick_moneyline(lines: Optional[List[Dict]]) -> tuple:
+    """(home_ml, away_ml, provider) from the first book that priced the game."""
+    priced = {}
+    for ln in lines or []:
+        home = ln.get("homeMoneyline", ln.get("home_moneyline"))
+        away = ln.get("awayMoneyline", ln.get("away_moneyline"))
+        if home is not None and away is not None:
+            priced[ln.get("provider")] = (int(home), int(away))
+    for provider in MONEYLINE_PROVIDERS:
+        if provider in priced:
+            return (*priced[provider], provider)
+    for provider, (home, away) in priced.items():  # any book beats no price
+        return (home, away, provider)
+    return (None, None, None)
+
+async def refresh_lines(season: int) -> int:
+    """Pull a season's lines and scores (one CFBD call) and replace the stored rows."""
+    data = await fetch_lines(season)
+    now = datetime.utcnow()
+    written = 0
+    with SessionLocal() as s:
+        s.execute(delete(GameLine).where(GameLine.season == season))
+        for g in data:
+            home_ml, away_ml, provider = _pick_moneyline(g.get("lines"))
+            s.add(GameLine(
+                season=season,
+                week=int(g.get("week") or 0),
+                game_id=int(g.get("id") or 0),
+                home_team=g.get("homeTeam") or g.get("home_team") or "",
+                away_team=g.get("awayTeam") or g.get("away_team") or "",
+                home_points=g.get("homeScore", g.get("home_score")),
+                away_points=g.get("awayScore", g.get("away_score")),
+                home_moneyline=home_ml,
+                away_moneyline=away_ml,
+                provider=provider,
+                last_updated=now,
+            ))
+            written += 1
+        s.commit()
+    return written
+
+async def ensure_lines(season: int) -> None:
+    """Fetch lines if we have none, or if a live season's copy has gone stale."""
+    with SessionLocal() as s:
+        newest = s.execute(
+            select(GameLine.last_updated)
+            .where(GameLine.season == season)
+            .order_by(GameLine.last_updated.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+
+    if newest is None:
+        await refresh_lines(season)
+        return
+    if season_is_final(season):
+        return
+    if newest < datetime.utcnow() - timedelta(seconds=_PF_TTL_SECONDS):
+        await refresh_lines(season)
+
+def american_to_decimal(moneyline: int) -> float:
+    """American odds to a decimal multiplier that includes the stake.
+
+    -150 means risk 150 to win 100 -> 1.667; +200 means risk 100 to win 200 -> 3.0.
+    """
+    if moneyline < 0:
+        return 1.0 + 100.0 / abs(moneyline)
+    return 1.0 + moneyline / 100.0
+
+def parlay_season(
+    session: Session, season: int, teams: List[str], stake: float = PARLAY_STAKE
+) -> Dict:
+    """Settle a flat parlay each week on every one of `teams` to win.
+
+    Only the player's teams that actually played that week are legs — byes are not
+    a leg. A leg with no quoted moneyline is dropped and the rest of the week still
+    runs. A week with no priced legs is skipped entirely and nothing is staked.
+    """
+    if not teams:
+        return {"weeks": [], "weeks_bet": 0, "weeks_hit": 0,
+                "staked": 0.0, "returned": 0.0, "net": 0.0, "best": None}
+
+    wanted = set(teams)
+    rows = session.execute(
+        select(GameLine).where(GameLine.season == season).order_by(GameLine.week)
+    ).scalars().all()
+
+    by_week: Dict[int, List[Dict]] = {}
+    for r in rows:
+        for team, moneyline, points, opp_points, opponent in (
+            (r.home_team, r.home_moneyline, r.home_points, r.away_points, r.away_team),
+            (r.away_team, r.away_moneyline, r.away_points, r.home_points, r.home_team),
+        ):
+            if team not in wanted:
+                continue
+            settled = points is not None and opp_points is not None
+            by_week.setdefault(r.week, []).append({
+                "team": team,
+                "opponent": opponent,
+                "moneyline": moneyline,
+                "won": (points > opp_points) if settled else None,
+                "priced": moneyline is not None and settled,
+            })
+
+    weeks = []
+    staked = returned = 0.0
+    for week in sorted(by_week):
+        legs = by_week[week]
+        priced = [l for l in legs if l["priced"]]
+        if not priced:
+            continue  # nothing quotable this week, so no bet was placed
+
+        multiplier = 1.0
+        for leg in priced:
+            multiplier *= american_to_decimal(leg["moneyline"])
+        hit = all(leg["won"] for leg in priced)
+        payout = stake * multiplier if hit else 0.0
+
+        staked += stake
+        returned += payout
+        weeks.append({
+            "week": week,
+            "legs": priced,
+            "dropped": [l["team"] for l in legs if not l["priced"]],
+            "multiplier": multiplier,
+            "hit": hit,
+            "payout": payout,
+        })
+
+    hits = [w for w in weeks if w["hit"]]
+    return {
+        "weeks": weeks,
+        "weeks_bet": len(weeks),
+        "weeks_hit": len(hits),
+        "staked": staked,
+        "returned": returned,
+        "net": returned - staked,
+        "best": max(hits, key=lambda w: w["payout"]) if hits else None,
     }
 
 def season_records(session: Session, season: int, teams: List[str]) -> Dict[str, Dict]:

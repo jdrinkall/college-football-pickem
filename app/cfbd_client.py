@@ -92,3 +92,11 @@ async def fetch_team_games(year: int, team: str) -> List[Dict[str, Any]]:
     Endpoint: GET /games?year=YYYY&team=Team
     """
     return await _get_list("/games", {"year": year, "team": team}, "/games")
+
+async def fetch_lines(year: int, season_type: str = "regular") -> List[Dict[str, Any]]:
+    """Return betting lines for a whole season in one call, scores included.
+    Endpoint: GET /lines?year=YYYY&seasonType=regular
+    """
+    return await _get_list(
+        "/lines", {"year": year, "seasonType": season_type}, "/lines"
+    )
