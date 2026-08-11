@@ -13,6 +13,7 @@
   <div class="max-w-5xl mx-auto flex gap-4 px-4 py-3">
     <a href="/" class="hover:underline {% if request.url.path == '/' %}font-bold{% endif %}">Home</a>
     <a href="/standings" class="hover:underline {% if request.url.path.startswith('/standings') %}font-bold{% endif %}">Standings</a>
+    <a href="/history" class="hover:underline {% if request.url.path.startswith('/history') %}font-bold{% endif %}">History</a>
   </div>
 </nav>
 

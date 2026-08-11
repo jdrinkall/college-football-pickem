@@ -4,7 +4,11 @@
     <form method="get" class="flex items-end gap-2">
       <div>
         <label class="block text-sm text-gray-600">Season</label>
-        <input name="year" value="{{ season }}" class="border rounded px-3 py-2 w-28" />
+        <select name="year" class="border rounded px-3 py-2">
+          {% for s in seasons %}
+            <option value="{{ s }}" {% if s == season %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div>
         <label class="block text-sm text-gray-600">Conference</label>
@@ -23,6 +27,14 @@
       <button class="border px-3 py-2 rounded">🔄 Refresh {{ season }}</button>
     </form>
   </div>
+
+  {% if not drafted %}
+    <div class="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+      <span class="font-semibold">No draft recorded for {{ season }} yet.</span>
+      Add each player's teams to <code class="text-sm">PICKS_BY_SEASON[{{ season }}]</code>
+      in <code class="text-sm">app/selected_teams.py</code> and they'll show up here.
+    </div>
+  {% endif %}
 
       <div class="mb-8">
     <h2 class="text-xl font-bold mb-2">Selected Teams by Individual</h2>

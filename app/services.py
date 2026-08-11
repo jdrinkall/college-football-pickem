@@ -1,12 +1,11 @@
 from __future__ import annotations
 import asyncio
 import os
-import time
-from datetime import datetime
-from typing import List, Dict
+from datetime import datetime, timedelta
+from typing import List, Dict, Optional
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
-from .models import Base, TeamRecord
+from .models import Base, TeamRecord, TeamPoints
 from .db import engine, SessionLocal
 from .cfbd_client import fetch_team_records, fetch_team_games
 
@@ -54,63 +53,149 @@ def upsert_records(session: Session, season: int, cfbd_records: List[Dict]) -> i
     session.commit()
     return written
 
-async def refresh_season(season: int) -> int:
-    """Fetch records from CFBD and write to DB. Returns count."""
+async def refresh_season(season: int, teams: Optional[List[str]] = None) -> int:
+    """Fetch records from CFBD and write to DB. Returns count.
+
+    When `teams` is given, that season's points are refreshed too. Callers that need
+    a fast return (app startup) omit it and let points refresh lazily on render.
+    """
     data = await fetch_team_records(season)
     with SessionLocal() as s:
-        return upsert_records(s, season, data)
+        written = upsert_records(s, season, data)
+    if teams:
+        await compute_points_for(season, teams, refresh=True)
+    return written
 
-# Points-for is computed at render time from the CFBD /games endpoint, one call per
-# team. Cache the per-team totals so a page view doesn't fan out ~54 API calls every
-# time. Keyed by (season, team) -> (monotonic timestamp, points).
-_PF_CACHE: dict[tuple[int, str], tuple[float, int]] = {}
+# How long a *live* season's stored points stay usable before we re-fetch. Finished
+# seasons are never re-fetched, so this only applies to the season in progress.
 _PF_TTL_SECONDS = int(os.getenv("POINTS_FOR_TTL", "900"))
 
-async def compute_points_for(season: int, teams: list[str]) -> dict[str, int]:
-    """Compute total points scored for each team in a season by summing game points.
+def season_is_final(season: int, today: Optional[datetime] = None) -> bool:
+    """True once a season's results can no longer change.
 
-    Results are cached for POINTS_FOR_TTL seconds (default 15 min). A team whose
-    fetch fails falls back to its last known value rather than failing the request.
+    A season's games run from August into early January (bowls, then the title game),
+    so the 2025 season is only settled from February 2026 onward.
     """
-    now = time.monotonic()
+    today = today or datetime.utcnow()
+    return (today.year > season and today.month >= 2) or today.year > season + 1
 
-    async def team_pf(team: str) -> tuple[str, int]:
-        cached = _PF_CACHE.get((season, team))
-        if cached and now - cached[0] < _PF_TTL_SECONDS:
-            return (team, cached[1])
+def _sum_points(games: List[Dict], team: str) -> int:
+    """Total points scored by `team` across its games."""
+    pf = 0
+    for g in games:
+        # Each game has home/away info; add the points for the side that matches 'team'
+        home = g.get("home_team") or g.get("homeTeam")
+        away = g.get("away_team") or g.get("awayTeam")
+        home_p = g.get("home_points") or g.get("homePoints") or 0
+        away_p = g.get("away_points") or g.get("awayPoints") or 0
+        if isinstance(home_p, str):
+            try: home_p = int(home_p)
+            except: home_p = 0
+        if isinstance(away_p, str):
+            try: away_p = int(away_p)
+            except: away_p = 0
+        if team == home:
+            pf += home_p or 0
+        elif team == away:
+            pf += away_p or 0
+    return int(pf)
 
-        games = await fetch_team_games(season, team)
-        pf = 0
-        for g in games:
-            # Each game has home/away info; add the points for the side that matches 'team'
-            home = g.get("home_team") or g.get("homeTeam")
-            away = g.get("away_team") or g.get("awayTeam")
-            home_p = g.get("home_points") or g.get("homePoints") or 0
-            away_p = g.get("away_points") or g.get("awayPoints") or 0
-            if isinstance(home_p, str):
-                try: home_p = int(home_p)
-                except: home_p = 0
-            if isinstance(away_p, str):
-                try: away_p = int(away_p)
-                except: away_p = 0
-            if team == home:
-                pf += home_p or 0
-            elif team == away:
-                pf += away_p or 0
-        pf = int(pf)
-        _PF_CACHE[(season, team)] = (now, pf)
-        return (team, pf)
+def _store_points(season: int, points: Dict[str, int]) -> None:
+    """Upsert per-team points for a season."""
+    now = datetime.utcnow()
+    with SessionLocal() as s:
+        existing = {
+            r.team: r
+            for r in s.execute(
+                select(TeamPoints).where(
+                    TeamPoints.season == season,
+                    TeamPoints.team.in_(list(points)),
+                )
+            ).scalars().all()
+        }
+        for team, pf in points.items():
+            row = existing.get(team)
+            if row is None:
+                s.add(TeamPoints(season=season, team=team, points_for=pf, last_updated=now))
+            else:
+                row.points_for = pf
+                row.last_updated = now
+        s.commit()
 
-    results = await asyncio.gather(
-        *(team_pf(t) for t in teams), return_exceptions=True
-    )
+async def compute_points_for(
+    season: int, teams: List[str], *, refresh: bool = False
+) -> Dict[str, int]:
+    """Points scored by each team in a season, served from the DB.
 
-    out: dict[str, int] = {}
-    for team, result in zip(teams, results):
-        if isinstance(result, BaseException):
-            stale = _PF_CACHE.get((season, team))
-            out[team] = stale[1] if stale else 0
-            print(f"Points-for fetch failed for {team} ({season}): {result}")
-        else:
-            out[team] = result[1]
-    return out
+    CFBD is called only for teams with no stored value, or — while a season is still
+    in progress — whose stored value has gone stale. A finished season is never
+    re-fetched, so history pages cost no API calls and survive a CFBD outage. A team
+    whose fetch fails falls back to its stored value rather than failing the request.
+    """
+    if not teams:
+        return {}
+
+    with SessionLocal() as s:
+        stored = {
+            r.team: (r.points_for, r.last_updated)
+            for r in s.execute(
+                select(TeamPoints).where(
+                    TeamPoints.season == season,
+                    TeamPoints.team.in_(teams),
+                )
+            ).scalars().all()
+        }
+
+    final = season_is_final(season)
+    cutoff = datetime.utcnow() - timedelta(seconds=_PF_TTL_SECONDS)
+
+    def needs_fetch(team: str) -> bool:
+        if refresh or team not in stored:
+            return True
+        if final:
+            return False
+        updated = stored[team][1]
+        return updated is None or updated < cutoff
+
+    to_fetch = [t for t in teams if needs_fetch(t)]
+
+    fetched: Dict[str, int] = {}
+    if to_fetch:
+        async def team_pf(team: str) -> int:
+            return _sum_points(await fetch_team_games(season, team), team)
+
+        results = await asyncio.gather(
+            *(team_pf(t) for t in to_fetch), return_exceptions=True
+        )
+        for team, result in zip(to_fetch, results):
+            if isinstance(result, BaseException):
+                print(f"Points-for fetch failed for {team} ({season}): {result}")
+            else:
+                fetched[team] = result
+        if fetched:
+            _store_points(season, fetched)
+
+    return {
+        team: fetched.get(team, stored.get(team, (0, None))[0])
+        for team in teams
+    }
+
+def season_records(session: Session, season: int, teams: List[str]) -> Dict[str, Dict]:
+    """W-L-T rows for the given teams in a season, keyed by team."""
+    if not teams:
+        return {}
+    rows = session.execute(
+        select(TeamRecord).where(
+            TeamRecord.season == season,
+            TeamRecord.team.in_(teams),
+        )
+    ).scalars().all()
+    return {
+        r.team: {
+            "wins": r.wins,
+            "losses": r.losses,
+            "ties": r.ties,
+            "games": r.total_games,
+        }
+        for r in rows
+    }

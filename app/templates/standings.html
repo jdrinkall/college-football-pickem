@@ -1,10 +1,30 @@
 
 {% extends 'base.html' %}
 {% block content %}
-<div class="mb-6">
-  <h1 class="text-2xl font-bold">Standings</h1>
-  <p class="text-sm text-gray-600">Sorted by wins (desc). Showing wins, losses, total games, and points scored.</p>
+<div class="mb-6 flex items-end justify-between gap-4 flex-wrap">
+  <div>
+    <h1 class="text-2xl font-bold">{{ season }} Standings</h1>
+    <p class="text-sm text-gray-600">Sorted by wins (desc), then points scored. See <a href="/history" class="underline">History</a> for career totals.</p>
+  </div>
+  <form method="get" class="flex items-end gap-2">
+    <div>
+      <label class="block text-sm text-gray-600">Season</label>
+      <select name="year" class="border rounded px-3 py-2">
+        {% for s in seasons %}
+          <option value="{{ s }}" {% if s == season %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="bg-blue-600 text-white px-4 py-2 rounded">Go</button>
+  </form>
 </div>
+
+{% if not drafted %}
+  <div class="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+    <span class="font-semibold">No draft recorded for {{ season }} yet.</span>
+    Standings will fill in once the picks are added.
+  </div>
+{% endif %}
 
 <div class="overflow-x-auto bg-white rounded-xl shadow">
   <table class="min-w-full table-auto">
