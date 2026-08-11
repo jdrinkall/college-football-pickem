@@ -51,6 +51,14 @@ def current_season() -> int:
     y = datetime.today().year
     return y if y in ALLOWED_SEASONS else max(ALLOWED_SEASONS)
 
+async def scheduled_refresh():
+    """Daily refresh job. Swallows errors so a bad run doesn't kill the scheduler."""
+    try:
+        count = await refresh_season(current_season())
+        print(f"Scheduled refresh wrote {count} rows")
+    except Exception as e:
+        print(f"Scheduled refresh failed: {e}")
+
 @app.on_event("startup")
 async def startup_event():
     try:
@@ -58,10 +66,13 @@ async def startup_event():
     except Exception as e:
         print(f"Startup refresh failed: {e}")
 
-    # Note: refresh_season is async; schedule a task to run it
+    # AsyncIOScheduler awaits coroutine functions itself — pass the function, not a
+    # lambda (a lambda returns an un-awaited coroutine that is silently discarded).
+    # Held on app.state so it isn't garbage collected.
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(lambda: refresh_season(current_season()), CronTrigger(hour=5, minute=0))
+    scheduler.add_job(scheduled_refresh, CronTrigger(hour=5, minute=0))
     scheduler.start()
+    app.state.scheduler = scheduler
 
 @app.get("/healthz")
 async def healthz():

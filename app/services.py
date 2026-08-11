@@ -1,11 +1,14 @@
 from __future__ import annotations
+import asyncio
+import os
+import time
 from datetime import datetime
 from typing import List, Dict
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 from .models import Base, TeamRecord
 from .db import engine, SessionLocal
-from .cfbd_client import fetch_team_records
+from .cfbd_client import fetch_team_records, fetch_team_games
 
 # Create tables on import
 Base.metadata.create_all(bind=engine)
@@ -57,12 +60,25 @@ async def refresh_season(season: int) -> int:
     with SessionLocal() as s:
         return upsert_records(s, season, data)
 
-from .cfbd_client import fetch_team_games
-import asyncio
+# Points-for is computed at render time from the CFBD /games endpoint, one call per
+# team. Cache the per-team totals so a page view doesn't fan out ~54 API calls every
+# time. Keyed by (season, team) -> (monotonic timestamp, points).
+_PF_CACHE: dict[tuple[int, str], tuple[float, int]] = {}
+_PF_TTL_SECONDS = int(os.getenv("POINTS_FOR_TTL", "900"))
 
 async def compute_points_for(season: int, teams: list[str]) -> dict[str, int]:
-    """Compute total points scored for each team in a season by summing game points."""
+    """Compute total points scored for each team in a season by summing game points.
+
+    Results are cached for POINTS_FOR_TTL seconds (default 15 min). A team whose
+    fetch fails falls back to its last known value rather than failing the request.
+    """
+    now = time.monotonic()
+
     async def team_pf(team: str) -> tuple[str, int]:
+        cached = _PF_CACHE.get((season, team))
+        if cached and now - cached[0] < _PF_TTL_SECONDS:
+            return (team, cached[1])
+
         games = await fetch_team_games(season, team)
         pf = 0
         for g in games:
@@ -81,6 +97,20 @@ async def compute_points_for(season: int, teams: list[str]) -> dict[str, int]:
                 pf += home_p or 0
             elif team == away:
                 pf += away_p or 0
-        return (team, int(pf))
-    results = await asyncio.gather(*(team_pf(t) for t in teams))
-    return dict(results)
+        pf = int(pf)
+        _PF_CACHE[(season, team)] = (now, pf)
+        return (team, pf)
+
+    results = await asyncio.gather(
+        *(team_pf(t) for t in teams), return_exceptions=True
+    )
+
+    out: dict[str, int] = {}
+    for team, result in zip(teams, results):
+        if isinstance(result, BaseException):
+            stale = _PF_CACHE.get((season, team))
+            out[team] = stale[1] if stale else 0
+            print(f"Points-for fetch failed for {team} ({season}): {result}")
+        else:
+            out[team] = result[1]
+    return out
