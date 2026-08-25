@@ -1,105 +1,57 @@
-"""Draft picks, keyed by season.
+"""Draft picks, loaded from the CSV files in drafts/.
 
-Each season has its own draft, so picks must always be looked up by the season
-being rendered. Scoring a season's records against a different season's picks
-produces wrong totals silently, which is why there is no season-less accessor here.
+One CSV per season, named after the year: drafts/2026.csv. Columns are
+`player,team`, one row per pick. Row order sets the display order of players;
+rows with an empty team are ignored, so a half-finished draft still loads.
 
-To add a season: add a key to PICKS_BY_SEASON. Everything else — the season
-dropdown, the allowed-season clamp, the history page — derives from this dict.
-A player is counted as having played a season only if their list is non-empty,
-so a scaffolded season with empty lists does not dilute career totals.
+Picks are always looked up by season — scoring a season's records against another
+season's draft produces wrong totals silently, so there is no season-less accessor.
+Adding a season means adding a CSV; nothing here needs editing.
+
+Run `python scripts/validate_draft.py 2026` after editing a draft file. Team names
+must match CFBD exactly ("San José State", "Miami (OH)"), and the validator checks
+that for you rather than letting a typo quietly score zero all season.
 """
 from __future__ import annotations
 
-PICKS_BY_SEASON: dict[int, dict[str, list[str]]] = {
-    2025: {
-        "Sean": [
-            "Ohio State",
-            "Miami",
-            "LSU",
-            "Navy",
-            "Army",
-            "Jacksonville State",
-        ],
-        "Randy": [
-            "Notre Dame",
-            "Kansas State",
-            "Louisiana",
-            "Utah",
-            "East Carolina",
-            "Western Kentucky",
-        ],
-        "Justin": [
-            "Oregon",
-            "Clemson",
-            "Indiana",
-            "Georgia Tech",
-            "Tennessee",
-            "Nebraska",
-        ],
-        "Matthew": [
-            "Penn State",
-            "Memphis",
-            "SMU",
-            "Illinois",
-            "Oklahoma",
-            "Miami (OH)",
-        ],
-        "Futa": [
-            "Georgia",
-            "Arizona State",
-            "South Carolina",
-            "Buffalo",
-            "Arkansas State",
-            "Colorado State",
-        ],
-        "Ben": [
-            "Texas",
-            "UNLV",
-            "Michigan",
-            "Ole Miss",
-            "Kansas",
-            "UTSA",
-        ],
-        "Austin": [
-            "Toledo",
-            "Alabama",
-            "San José State",
-            "Iowa State",
-            "Florida",
-            "Baylor",
-        ],
-        "Nick": [
-            "Liberty",
-            "James Madison",
-            "BYU",
-            "Georgia Southern",
-            "Missouri",
-            "USC",
-        ],
-        "Oliver": [
-            "Boise State",
-            "Tulane",
-            "Texas Tech",
-            "Louisville",
-            "Texas A&M",
-            "Ohio",
-        ],
-    },
-    # 2026 draft has not happened yet. Fill in the team lists below once it does —
-    # no other code changes are needed. Drop or add players here if the roster changes.
-    2026: {
-        "Sean": [],
-        "Randy": [],
-        "Justin": [],
-        "Matthew": [],
-        "Futa": [],
-        "Ben": [],
-        "Austin": [],
-        "Nick": [],
-        "Oliver": [],
-    },
-}
+import csv
+import os
+import re
+from datetime import datetime
+
+DRAFTS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "drafts"
+)
+
+def _load_draft(path: str) -> dict[str, list[str]]:
+    """Read one season CSV into {player: [teams]}, preserving row order."""
+    picks: dict[str, list[str]] = {}
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            player = (row.get("player") or "").strip()
+            team = (row.get("team") or "").strip()
+            if not player:
+                continue
+            picks.setdefault(player, [])
+            if team:
+                picks[player].append(team)
+    return picks
+
+def _load_all() -> dict[int, dict[str, list[str]]]:
+    seasons: dict[int, dict[str, list[str]]] = {}
+    if not os.path.isdir(DRAFTS_DIR):
+        return seasons
+    for name in sorted(os.listdir(DRAFTS_DIR)):
+        match = re.fullmatch(r"(\d{4})\.csv", name)
+        if match:
+            seasons[int(match.group(1))] = _load_draft(os.path.join(DRAFTS_DIR, name))
+    return seasons
+
+PICKS_BY_SEASON: dict[int, dict[str, list[str]]] = _load_all()
+
+# An empty drafts/ directory would otherwise break every page at import time.
+if not PICKS_BY_SEASON:
+    PICKS_BY_SEASON = {datetime.today().year: {}}
 
 SEASONS: list[int] = sorted(PICKS_BY_SEASON)
 LATEST_SEASON: int = SEASONS[-1]
