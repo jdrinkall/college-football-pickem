@@ -1,0 +1,164 @@
+Valid team names for the 2026 draft (138 FBS teams).
+Copy names from here EXACTLY - spelling and punctuation must match.
+================================================================
+
+ACC (17)
+  Boston College
+  California
+  Clemson
+  Duke
+  Florida State
+  Georgia Tech
+  Louisville
+  Miami
+  NC State
+  North Carolina
+  Pittsburgh
+  SMU
+  Stanford
+  Syracuse
+  Virginia
+  Virginia Tech
+  Wake Forest
+
+American Athletic (14)
+  Army
+  Charlotte
+  East Carolina
+  Florida Atlantic
+  Memphis
+  Navy
+  North Texas
+  Rice
+  South Florida
+  Temple
+  Tulane
+  Tulsa
+  UAB
+  UTSA
+
+Big 12 (16)
+  Arizona
+  Arizona State
+  BYU
+  Baylor
+  Cincinnati
+  Colorado
+  Houston
+  Iowa State
+  Kansas
+  Kansas State
+  Oklahoma State
+  TCU
+  Texas Tech
+  UCF
+  Utah
+  West Virginia
+
+Big Ten (18)
+  Illinois
+  Indiana
+  Iowa
+  Maryland
+  Michigan
+  Michigan State
+  Minnesota
+  Nebraska
+  Northwestern
+  Ohio State
+  Oregon
+  Penn State
+  Purdue
+  Rutgers
+  UCLA
+  USC
+  Washington
+  Wisconsin
+
+Conference USA (10)
+  Delaware
+  Florida International
+  Jacksonville State
+  Kennesaw State
+  Liberty
+  Middle Tennessee
+  Missouri State
+  New Mexico State
+  Sam Houston
+  Western Kentucky
+
+FBS Independents (2)
+  Notre Dame
+  UConn
+
+Mid-American (13)
+  Akron
+  Ball State
+  Bowling Green
+  Buffalo
+  Central Michigan
+  Eastern Michigan
+  Kent State
+  Massachusetts
+  Miami (OH)
+  Ohio
+  Sacramento State
+  Toledo
+  Western Michigan
+
+Mountain West (10)
+  Air Force
+  Hawai'i
+  Nevada
+  New Mexico
+  North Dakota State
+  Northern Illinois
+  San José State
+  UNLV
+  UTEP
+  Wyoming
+
+Pac-12 (8)
+  Boise State
+  Colorado State
+  Fresno State
+  Oregon State
+  San Diego State
+  Texas State
+  Utah State
+  Washington State
+
+SEC (16)
+  Alabama
+  Arkansas
+  Auburn
+  Florida
+  Georgia
+  Kentucky
+  LSU
+  Mississippi State
+  Missouri
+  Oklahoma
+  Ole Miss
+  South Carolina
+  Tennessee
+  Texas
+  Texas A&M
+  Vanderbilt
+
+Sun Belt (14)
+  App State
+  Arkansas State
+  Coastal Carolina
+  Georgia Southern
+  Georgia State
+  James Madison
+  Louisiana
+  Louisiana Tech
+  Marshall
+  Old Dominion
+  South Alabama
+  Southern Miss
+  Troy
+  UL Monroe
+
