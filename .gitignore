@@ -205,3 +205,5 @@ __marimo__/
 
 # Debugging
 debugging
+# Ad artwork parked but not shipped (see app/static/ads/README.txt)
+app/static/ads/_unused/
