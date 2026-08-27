@@ -32,6 +32,8 @@ from .selected_teams import (
     played_seasons,
 )
 
+from .ads import ad_slots
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
@@ -43,6 +45,10 @@ app = FastAPI(title="CFB Wins & Points For")
 # UI + static
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+
+# Every page extends base.html, which draws the ad rails, so the slots are a Jinja
+# global rather than something all four routes have to remember to pass through.
+templates.env.globals["ads"] = ad_slots()
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
 # Seasons come from the draft data — adding a season to selected_teams.py is enough.
