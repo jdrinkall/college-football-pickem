@@ -131,6 +131,7 @@
     <a href="/" class="hover:underline {% if request.url.path == '/' %}font-bold{% endif %}">Home</a>
     <a href="/standings" class="hover:underline {% if request.url.path.startswith('/standings') %}font-bold{% endif %}">Standings</a>
     <a href="/parlay" class="hover:underline {% if request.url.path.startswith('/parlay') %}font-bold{% endif %}">Parlay</a>
+    <a href="/players" class="hover:underline {% if request.url.path.startswith('/players') %}font-bold{% endif %}">Players</a>
     <a href="/history" class="hover:underline {% if request.url.path.startswith('/history') %}font-bold{% endif %}">History</a>
   </div>
 </nav>

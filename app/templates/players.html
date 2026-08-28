@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">{{ season }} Players</h1>
+  <p class="text-sm text-gray-600">
+    Every team a player drafted, with its schedule. Regular season only —
+    bowls and playoff games aren't included.
+  </p>
+</div>
+
+{% if players %}
+<div class="mb-6 flex flex-wrap gap-2">
+  {% for name in players %}
+    <a href="/players?player={{ name | urlencode }}"
+       class="px-3 py-1.5 rounded-full border text-sm
+              {% if name == selected %}bg-blue-600 border-blue-600 text-white font-semibold
+              {% else %}bg-white border-gray-300 text-gray-700 hover:bg-gray-100{% endif %}">
+      {{ name }}
+    </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if not drafted %}
+  <div class="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+    <span class="font-semibold">No draft recorded for {{ season }} yet.</span>
+    Rosters will fill in once the picks are added.
+  </div>
+{% endif %}
+
+<div class="grid gap-6 md:grid-cols-2">
+  {% for entry in roster %}
+  <section class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="flex items-baseline justify-between gap-3 px-4 py-3 bg-gray-100 border-b">
+      <h2 class="font-semibold">{{ entry.team }}</h2>
+      {% if entry.record.games %}
+        <span class="text-sm text-gray-600 tabular-nums">
+          {{ entry.record.wins }}-{{ entry.record.losses }}{% if entry.record.ties %}-{{ entry.record.ties }}{% endif %}
+        </span>
+      {% else %}
+        <span class="text-sm text-gray-400">no record yet</span>
+      {% endif %}
+    </div>
+
+    {% if entry.games %}
+    <table class="min-w-full table-auto text-sm">
+      <tbody>
+        {% for g in entry.games %}
+        <tr class="border-t">
+          <td class="px-4 py-2 text-gray-500 tabular-nums w-12">Wk {{ g.week }}</td>
+          <td class="px-4 py-2">
+            <span class="text-gray-500">{{ 'vs' if g.at_home else '@' }}</span>
+            {{ g.opponent }}
+          </td>
+          <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">
+            {% if g.played %}
+              <span class="font-semibold {% if g.result == 'W' %}text-green-700{% elif g.result == 'L' %}text-red-700{% else %}text-gray-600{% endif %}">
+                {{ g.result }}
+              </span>
+              <span class="text-gray-600">{{ g.points }}-{{ g.opponent_points }}</span>
+            {% else %}
+              <span class="text-gray-400">scheduled</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="px-4 py-6 text-center text-gray-500 text-sm">No games stored for this team yet.</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

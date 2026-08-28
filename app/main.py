@@ -18,6 +18,7 @@ from .services import (
     refresh_season,
     compute_points_for,
     season_records,
+    team_schedules,
     ensure_lines,
     parlay_season,
     PARLAY_STAKE,
@@ -249,6 +250,44 @@ async def parlay(request: Request, year: Optional[int] = None, db: Session = Dep
             "stake": PARLAY_STAKE,
             "book_order": MONEYLINE_PROVIDERS,
             "drafted": bool(teams_for(season)),
+        },
+    )
+
+@app.get("/players", response_class=HTMLResponse)
+async def players(request: Request, player: Optional[str] = None, db: Session = Depends(get_db)):
+    """One player's roster for the current season, with each team's schedule.
+
+    Current season only, by design — this is the "who do I still have left to
+    play" page, so there is no season selector.
+    """
+    season = current_season()
+    season_picks = picks_for(season)
+    names = list(season_picks)
+    # An unknown or missing ?player= falls back to the first name rather than 404ing.
+    selected = player if player in season_picks else (names[0] if names else None)
+    teams = season_picks.get(selected) or []
+
+    records = season_records(db, season, teams)
+    schedules = team_schedules(db, season, teams)
+
+    roster = [
+        {
+            "team": team,
+            "record": records.get(team) or {},
+            "games": schedules.get(team) or [],
+        }
+        for team in teams
+    ]
+
+    return templates.TemplateResponse(
+        "players.html",
+        {
+            "request": request,
+            "season": season,
+            "players": names,
+            "selected": selected,
+            "roster": roster,
+            "drafted": bool(teams),
         },
     )
 
