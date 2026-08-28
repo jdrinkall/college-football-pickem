@@ -72,6 +72,20 @@ def played_seasons(player: str) -> list[int]:
     return [s for s in SEASONS if PICKS_BY_SEASON[s].get(player)]
 
 
+def latest_drafted_season() -> int:
+    """Newest season that actually has picks in it.
+
+    Not the same as LATEST_SEASON. A season's CSV is usually added before its
+    draft happens, and until it is filled in every row is blank — so a page
+    about "the teams you have this season" should stay on the last real draft
+    rather than jumping to an empty one the moment next year's file appears.
+    """
+    for season in reversed(SEASONS):
+        if any(PICKS_BY_SEASON[season].values()):
+            return season
+    return LATEST_SEASON
+
+
 def all_players() -> list[str]:
     """Every player across all seasons, ordered by the season they first appear in."""
     ordered: list[str] = []
