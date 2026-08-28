@@ -3,7 +3,7 @@ import asyncio
 import os
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, or_
 from sqlalchemy.orm import Session
 from .models import Base, TeamRecord, TeamPoints, GameLine
 from .db import engine, SessionLocal
@@ -353,3 +353,51 @@ def season_records(session: Session, season: int, teams: List[str]) -> Dict[str,
         }
         for r in rows
     }
+
+
+def team_schedules(
+    session: Session, season: int, teams: List[str]
+) -> Dict[str, List[Dict]]:
+    """Each team's season schedule, earliest week first, keyed by team.
+
+    Built from the stored game rows the parlay already relies on, so a schedule
+    costs no CFBD calls. Those rows are regular season only, so bowls and
+    playoff games are absent. A game between two drafted teams appears in both
+    teams' lists, each from that team's own point of view.
+    """
+    if not teams:
+        return {}
+
+    rows = session.execute(
+        select(GameLine)
+        .where(
+            GameLine.season == season,
+            or_(GameLine.home_team.in_(teams), GameLine.away_team.in_(teams)),
+        )
+        .order_by(GameLine.week, GameLine.game_id)
+    ).scalars().all()
+
+    schedules: Dict[str, List[Dict]] = {team: [] for team in teams}
+    for row in rows:
+        # Read each row from both ends; only the drafted side(s) are kept.
+        for team, opponent, points, opp_points, at_home in (
+            (row.home_team, row.away_team, row.home_points, row.away_points, True),
+            (row.away_team, row.home_team, row.away_points, row.home_points, False),
+        ):
+            if team not in schedules:
+                continue
+            # A game with no score yet is on the schedule but not played.
+            played = points is not None and opp_points is not None
+            result = None
+            if played:
+                result = "W" if points > opp_points else "L" if points < opp_points else "T"
+            schedules[team].append({
+                "week": row.week,
+                "opponent": opponent,
+                "at_home": at_home,
+                "points": points,
+                "opponent_points": opp_points,
+                "played": played,
+                "result": result,
+            })
+    return schedules

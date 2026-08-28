@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -m 2 -o /dev/null http://127.0.0.1:8078/healthz)",
+      "Bash(curl -s -m 2 -o /dev/null http://127.0.0.1:8077/healthz)"
+    ]
+  }
+}
