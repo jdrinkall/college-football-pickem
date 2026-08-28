@@ -173,11 +173,12 @@ async def index(
     )
 
 @app.post("/admin/refresh")
-async def admin_refresh(year: Optional[int] = None):
+async def admin_refresh(year: Optional[int] = None, points_from_cfbd: bool = False):
     season = resolve_season(year)
     try:
-        # Explicit refresh also re-pulls points, so the button updates both columns
-        count = await refresh_season(season, teams_for(season))
+        # Explicit refresh also re-pulls lines, so the button updates both columns.
+        # points_from_cfbd=true spends a call per team to fold in the postseason.
+        count = await refresh_season(season, teams_for(season), points_from_cfbd=points_from_cfbd)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"updated": count, "season": season}
@@ -186,11 +187,11 @@ async def admin_refresh(year: Optional[int] = None):
 REFRESH_TOKEN = os.getenv("REFRESH_TOKEN")
 
 @app.post("/admin/refresh_token")
-async def admin_refresh_token(token: str, year: int | None = None):
+async def admin_refresh_token(token: str, year: int | None = None, points_from_cfbd: bool = False):
     if not REFRESH_TOKEN or not secrets.compare_digest(token, REFRESH_TOKEN):
         raise HTTPException(status_code=403, detail="forbidden")
     season = resolve_season(year)
-    count = await refresh_season(season, teams_for(season))
+    count = await refresh_season(season, teams_for(season), points_from_cfbd=points_from_cfbd)
     return {"updated": count, "season": season}
 
 async def season_standings(db: Session, season: int) -> list[dict]:

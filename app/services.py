@@ -53,18 +53,29 @@ def upsert_records(session: Session, season: int, cfbd_records: List[Dict]) -> i
     session.commit()
     return written
 
-async def refresh_season(season: int, teams: Optional[List[str]] = None) -> int:
+async def refresh_season(
+    season: int, teams: Optional[List[str]] = None, *, points_from_cfbd: bool = False
+) -> int:
     """Fetch records from CFBD and write to DB. Returns count.
 
-    When `teams` is given, that season's points are refreshed too. Callers that need
-    a fast return (app startup) omit it and let points refresh lazily on render.
+    When `teams` is given, that season's lines and points are refreshed too.
+    Callers that need a fast return (app startup) omit it.
+
+    Costs two CFBD calls: /records and /lines. Points are derived from the lines
+    rows rather than fetched per team. Pass points_from_cfbd=True to spend one
+    call per team instead and pick up postseason scoring — worth doing once after
+    a season's bowls, not on a schedule.
     """
     data = await fetch_team_records(season)
     with SessionLocal() as s:
         written = upsert_records(s, season, data)
     if teams:
-        await compute_points_for(season, teams, refresh=True)
-        await refresh_lines(season)  # one call; keeps the parlay page warm
+        # Lines first: points are summed from the rows this writes.
+        await refresh_lines(season)
+        if points_from_cfbd:
+            await refresh_points_from_cfbd(season, teams)
+        else:
+            await compute_points_for(season, teams, refresh=True)
     return written
 
 # How long a *live* season's stored points stay usable before we re-fetch. Finished
@@ -123,22 +134,66 @@ def _store_points(season: int, points: Dict[str, int]) -> None:
                 row.last_updated = now
         s.commit()
 
-async def compute_points_for(
-    season: int, teams: List[str], *, refresh: bool = False
+def points_from_games(
+    session: Session, season: int, teams: List[str]
 ) -> Dict[str, int]:
-    """Points scored by each team in a season, served from the DB.
+    """Points scored by each team, summed from the stored game rows.
 
-    CFBD is called only for teams with no stored value, or — while a season is still
-    in progress — whose stored value has gone stale. A finished season is never
-    re-fetched, so history pages cost no API calls and survive a CFBD outage. A team
-    whose fetch fails falls back to its stored value rather than failing the request.
+    The same arithmetic _sum_points does against CFBD /games, run instead over
+    the rows refresh_lines already pulled in a single request. Only teams that
+    actually appear in a stored game are returned, so the caller can tell "no
+    local data for this team" apart from "played but scored nothing".
+
+    Regular season only, because that is what the lines feed covers.
     """
     if not teams:
         return {}
 
+    rows = session.execute(
+        select(GameLine).where(
+            GameLine.season == season,
+            or_(GameLine.home_team.in_(teams), GameLine.away_team.in_(teams)),
+        )
+    ).scalars().all()
+
+    wanted = set(teams)
+    totals: Dict[str, int] = {}
+    for row in rows:
+        for team, points in ((row.home_team, row.home_points), (row.away_team, row.away_points)):
+            if team not in wanted:
+                continue
+            # Seeing the fixture is enough to count as local data; an unplayed
+            # game contributes nothing but still means the team is covered.
+            totals.setdefault(team, 0)
+            if points is not None:
+                totals[team] += points
+    return totals
+
+
+async def compute_points_for(
+    season: int, teams: List[str], *, refresh: bool = False
+) -> Dict[str, int]:
+    """Points scored by each team in a season. Makes no external calls.
+
+    The scores are already in game_lines, so this is one query plus arithmetic
+    rather than a /games call per team — which used to mean 54 calls every time
+    the TTL lapsed, and 54 calls per page load whenever those calls were failing.
+
+    A finished season keeps whatever is stored for it. Those values came from a
+    feed that included conference championships and bowls, which the lines feed
+    does not, and recomputing them locally would silently drop real points from
+    the standings. Only the live season is derived here, where the difference is
+    nil until January. Use refresh_points_from_cfbd() once a season ends to fold
+    the postseason back in.
+    """
+    if not teams:
+        return {}
+
+    final = season_is_final(season)
+
     with SessionLocal() as s:
         stored = {
-            r.team: (r.points_for, r.last_updated)
+            r.team: r.points_for
             for r in s.execute(
                 select(TeamPoints).where(
                     TeamPoints.season == season,
@@ -146,40 +201,51 @@ async def compute_points_for(
                 )
             ).scalars().all()
         }
+        local = points_from_games(s, season, teams)
 
-    final = season_is_final(season)
-    cutoff = datetime.utcnow() - timedelta(seconds=_PF_TTL_SECONDS)
+    result: Dict[str, int] = {}
+    changed: Dict[str, int] = {}
+    for team in teams:
+        if final and not refresh and team in stored:
+            result[team] = stored[team]          # postseason-inclusive, leave it alone
+        elif team in local:
+            result[team] = local[team]
+            if stored.get(team) != local[team]:
+                changed[team] = local[team]
+        else:
+            result[team] = stored.get(team, 0)   # no games stored yet
 
-    def needs_fetch(team: str) -> bool:
-        if refresh or team not in stored:
-            return True
-        if final:
-            return False
-        updated = stored[team][1]
-        return updated is None or updated < cutoff
+    # Keep the table current so the numbers survive a lines table that gets cleared.
+    if changed:
+        _store_points(season, changed)
 
-    to_fetch = [t for t in teams if needs_fetch(t)]
+    return result
+
+
+async def refresh_points_from_cfbd(season: int, teams: List[str]) -> Dict[str, int]:
+    """Recompute points from CFBD /games — one call per team, postseason included.
+
+    The expensive path, kept for the once-a-year job of finalising a season after
+    the bowls. Nothing calls this on a page render or on the daily refresh.
+    """
+    if not teams:
+        return {}
+
+    async def team_pf(team: str) -> int:
+        return _sum_points(await fetch_team_games(season, team), team)
+
+    results = await asyncio.gather(*(team_pf(t) for t in teams), return_exceptions=True)
 
     fetched: Dict[str, int] = {}
-    if to_fetch:
-        async def team_pf(team: str) -> int:
-            return _sum_points(await fetch_team_games(season, team), team)
+    for team, result in zip(teams, results):
+        if isinstance(result, BaseException):
+            print(f"Points-for fetch failed for {team} ({season}): {result}")
+        else:
+            fetched[team] = result
+    if fetched:
+        _store_points(season, fetched)
+    return fetched
 
-        results = await asyncio.gather(
-            *(team_pf(t) for t in to_fetch), return_exceptions=True
-        )
-        for team, result in zip(to_fetch, results):
-            if isinstance(result, BaseException):
-                print(f"Points-for fetch failed for {team} ({season}): {result}")
-            else:
-                fetched[team] = result
-        if fetched:
-            _store_points(season, fetched)
-
-    return {
-        team: fetched.get(team, stored.get(team, (0, None))[0])
-        for team in teams
-    }
 
 # ---------------------------------------------------------------------------
 # Parlay: a flat stake each week on every one of a player's teams to win.
@@ -236,8 +302,18 @@ async def refresh_lines(season: int) -> int:
         s.commit()
     return written
 
+# A failed lines refresh is remembered so the next render does not try again
+# immediately. Without this, an outage or a spent quota means every page load
+# re-attempts the fetch — with retries and backoff — and nothing ever caches.
+_lines_retry_after: Dict[int, datetime] = {}
+
+
 async def ensure_lines(season: int) -> None:
-    """Fetch lines if we have none, or if a live season's copy has gone stale."""
+    """Fetch lines if we have none, or if a live season's copy has gone stale.
+
+    Never raises: the parlay page is drawn from whatever rows are already stored,
+    so CFBD being unreachable makes the numbers stale, not the page broken.
+    """
     with SessionLocal() as s:
         newest = s.execute(
             select(GameLine.last_updated)
@@ -246,13 +322,22 @@ async def ensure_lines(season: int) -> None:
             .limit(1)
         ).scalar_one_or_none()
 
-    if newest is None:
-        await refresh_lines(season)
+    if newest is not None:
+        if season_is_final(season):
+            return
+        if newest >= datetime.utcnow() - timedelta(seconds=_PF_TTL_SECONDS):
+            return
+
+    retry_at = _lines_retry_after.get(season)
+    if retry_at is not None and datetime.utcnow() < retry_at:
         return
-    if season_is_final(season):
-        return
-    if newest < datetime.utcnow() - timedelta(seconds=_PF_TTL_SECONDS):
+
+    try:
         await refresh_lines(season)
+        _lines_retry_after.pop(season, None)
+    except Exception as e:
+        _lines_retry_after[season] = datetime.utcnow() + timedelta(seconds=_PF_TTL_SECONDS)
+        print(f"Lines refresh failed for {season}, using stored rows: {e}")
 
 def american_to_decimal(moneyline: int) -> float:
     """American odds to a decimal multiplier that includes the stake.
