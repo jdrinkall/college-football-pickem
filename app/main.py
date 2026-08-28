@@ -31,6 +31,7 @@ from .selected_teams import (
     teams_for,
     all_players,
     played_seasons,
+    latest_drafted_season,
 )
 
 from .ads import ad_slots
@@ -259,8 +260,12 @@ async def players(request: Request, player: Optional[str] = None, db: Session = 
 
     Current season only, by design — this is the "who do I still have left to
     play" page, so there is no season selector.
+
+    Deliberately not current_season(): that follows the SEASON_YEAR setting,
+    which is there to pin what the rest of the site displays. This page is meant
+    to always be about the season people are actually playing right now.
     """
-    season = current_season()
+    season = latest_drafted_season()
     season_picks = picks_for(season)
     names = list(season_picks)
     # An unknown or missing ?player= falls back to the first name rather than 404ing.
