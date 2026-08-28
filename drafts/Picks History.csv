@@ -1,0 +1,325 @@
+Year,Player,Pick Num,School Name
+2021,Sean,1,Alabama
+2021,Sean,6,Appalachian State
+2021,Matthew,4,Arizona State
+2021,Oliver,6,Army
+2021,Sean,5,Ball State
+2021,Futa,2,Boise State
+2021,Justin,2,Buffalo
+2021,Nick,5,BYU
+2021,Austin,1,Cincinnati
+2021,Justin,1,Clemson
+2021,Oliver,1,Coastal Carolina
+2021,Futa,4,Colorado State
+2021,Randy,5,Florida International
+2021,Randy,2,Florida
+2021,Justin,6,florida state
+2021,Justin,5,Fresno state
+2021,Nick,1,Georgia
+2021,Nick,3,Georgia Southern
+2021,Futa,6,Hawaii
+2021,Austin,2,Indiana
+2021,Futa,1,Iowa
+2021,Nick,2,Iowa State
+2021,Oliver,2,Liberty
+2021,Matthew,3,Louisiana
+2021,Randy,3,Louisville
+2021,Ben,4,Marshall
+2021,Nick,4,Memphis
+2021,Justin,4,Miami (FL)
+2021,Austin,4,Miami (OH)
+2021,Austin,6,Michigan
+2021,Futa,3,Nevada
+2021,Ben,1,Notre Dame
+2021,Randy,1,Ohio State
+2021,Matthew,1,Oklahoma
+2021,Matthew,6,Oklahoma State
+2021,Ben,6,Ole Miss
+2021,Ben,2,Oregon
+2021,Austin,3,Penn State
+2021,Randy,4,Rice
+2021,Nick,6,San Diego State
+2021,Randy,6,SMU
+2021,Sean,4,Texas
+2021,Matthew,2,Texas A&M
+2021,Oliver,3,Toledo
+2021,Futa,5,Troy
+2021,Oliver,5,UAB
+2021,Sean,2,UCF
+2021,Austin,5,UCLA
+2021,Sean,3,USC
+2021,Justin,3,Utah
+2021,Oliver,4,UTSA
+2021,Ben,5,Virginia Tech
+2021,Ben,3,Washington
+2021,Matthew,5,Western Kentucky
+2022,Sean,3,Air Force
+2022,Randy,1,Alabama
+2022,Futa,2,Appalachian State
+2022,Futa,1,Arkansas
+2022,Ben,6,Army
+2022,Matthew,5,Baylor
+2022,Sean,2,Boise State
+2022,Futa,3,BYU
+2022,Oliver,1,Cincinnati
+2022,Ben,1,Clemson
+2022,Matthew,4,Coastal Carolina
+2022,Nick,4,Florida
+2022,Randy,5,Florida State
+2022,Oliver,3,Fresno State
+2022,Justin,1,Georgia
+2022,Austin,1,Houston
+2022,Nick,3,Iowa
+2022,Sean,6,Kentucky
+2022,Nick,2,Liberty
+2022,Austin,2,Louisiana
+2022,Randy,4,Marshall
+2022,Justin,5,Miami (FL)
+2022,Oliver,2,Michigan
+2022,Austin,5,Michigan State
+2022,Nick,6,Nevada
+2022,Matthew,3,North Carolina State
+2022,Ben,5,Northern Illinois
+2022,Futa,5,Northwestern
+2022,Nick,1,Notre Dame
+2022,Sean,1,Ohio State
+2022,Matthew,2,Oklahoma
+2022,Austin,3,Oklahoma State
+2022,Oliver,6,Ole Miss
+2022,Randy,3,Oregon
+2022,Sean,5,Penn State
+2022,Justin,3,Pitt
+2022,Randy,6,Rice
+2022,Austin,4,San Diego State
+2022,Futa,6,SMU
+2022,Matthew,6,Tennessee
+2022,Randy,2,Texas
+2022,Ben,2,Texas A&M
+2022,Oliver,4,Toledo
+2022,Justin,4,UAB
+2022,Ben,4,UCF
+2022,Oliver,5,UCLA
+2022,Justin,2,USC
+2022,Matthew,1,Utah
+2022,Justin,6,Utah State
+2022,Futa,4,UTSA
+2022,Austin,6,Wake Forest
+2022,Nick,5,Washington
+2022,Sean,4,Western Kentucky
+2022,Ben,3,Wisconsin
+2023,Austin,1,Wisconsin
+2023,Austin,2,Washington
+2023,Austin,3,Ole Miss
+2023,Austin,4,North Carolina
+2023,Austin,5,Illinois
+2023,Austin,6,Coastal Carolina
+2023,Ben,1,Michigan
+2023,Ben,2,Oklahoma
+2023,Ben,3,Tulane
+2023,Ben,4,Ohio
+2023,Ben,5,Troy
+2023,Ben,6,Miami (FL)
+2023,Futa,1,Georgia
+2023,Futa,2,Cincinnati
+2023,Futa,3,Fresno State
+2023,Futa,4,Louisiana Tech
+2023,Futa,5,San Diego State
+2023,Futa,6,Temple
+2023,Justin,1,Alabama
+2023,Justin,2,Tennessee
+2023,Justin,3,Texas Christian
+2023,Justin,4,Oregon State
+2023,Justin,5,Pitt
+2023,Justin,6,North Texas
+2023,Matthew,1,USC
+2023,Matthew,2,Penn State
+2023,Matthew,3,Boise State
+2023,Matthew,4,Utah
+2023,Matthew,5,SMU
+2023,Matthew,6,Texas A&M
+2023,Nick,1,LSU
+2023,Nick,2,Florida State
+2023,Nick,3,Iowa
+2023,Nick,4,Texas Tech
+2023,Nick,5,UAB
+2023,Nick,6,Kansas
+2023,Oliver,1,Toledo
+2023,Oliver,2,Texas
+2023,Oliver,3,James Madison
+2023,Oliver,4,UTSA
+2023,Oliver,5,UCLA
+2023,Oliver,6,Sam Houston State
+2023,Randy,1,Notre Dame
+2023,Randy,2,Colorado
+2023,Randy,3,South Alabama
+2023,Randy,4,Western Kentucky
+2023,Randy,5,Kansas State
+2023,Randy,6,UCF
+2023,Sean,1,Ohio State
+2023,Sean,2,Clemson
+2023,Sean,3,Oregon
+2023,Sean,4,Liberty
+2023,Sean,5,Air Force
+2023,Sean,6,Louisville
+2024,Austin,1,Georgia
+2024,Austin,2,Michigan
+2024,Austin,3,Clemson
+2024,Austin,4,Oklahoma
+2024,Austin,5,Colorado
+2024,Austin,6,Jacksonville State
+2024,Ben,1,Alabama
+2024,Ben,2,Florida State
+2024,Ben,3,Southern Methodist
+2024,Ben,4,Kansas
+2024,Ben,5,Iowa State
+2024,Ben,6,Louisiana
+2024,Futa,1,Liberty
+2024,Futa,2,Kansas State
+2024,Futa,3,Louisiana State
+2024,Futa,4,Tennessee
+2024,Futa,5,Texas A&M
+2024,Futa,6,Troy
+2024,Justin,1,Oregon
+2024,Justin,2,Mississippi
+2024,Justin,3,North Carolina State
+2024,Justin,4,Appalachian State
+2024,Justin,5,Toledo
+2024,Justin,6,Fresno State
+2024,Matthew,1,Boise State
+2024,Matthew,2,Missouri
+2024,Matthew,3,Texas State
+2024,Matthew,4,Miami (OH)
+2024,Matthew,5,Air Force
+2024,Matthew,6,Oregon State
+2024,Nick,1,Ohio State
+2024,Nick,2,Indiana
+2024,Nick,3,Tulane
+2024,Nick,4,Nevada-Las Vegas
+2024,Nick,5,Bowling Green
+2024,Nick,6,Western Kentucky
+2024,Oliver,1,Texas
+2024,Oliver,2,Memphis
+2024,Oliver,3,Miami (FL)
+2024,Oliver,4,James Madison
+2024,Oliver,5,Louisville
+2024,Oliver,6,Washington State
+2024,Randy,1,Notre Dame
+2024,Randy,2,Iowa
+2024,Randy,3,Southern California
+2024,Randy,4,Nevada
+2024,Randy,5,Buffalo
+2024,Randy,6,Northwestern
+2024,Sean,1,Penn State
+2024,Sean,2,Utah
+2024,Sean,3,Virginia Tech
+2024,Sean,4,Texas-San Antonio
+2024,Sean,5,Oklahoma State
+2024,Sean,6,Central Florida
+2025,Sean,1,Ohio State
+2025,Sean,2,Miami (FL)
+2025,Sean,3,Louisiana State
+2025,Sean,4,Navy
+2025,Sean,5,Army
+2025,Sean,6,Jacksonville State
+2025,Randy,1,Notre Dame
+2025,Randy,2,Kansas State
+2025,Randy,3,Louisiana
+2025,Randy,4,Utah
+2025,Randy,5,East Carolina
+2025,Randy,6,Western Kentucky
+2025,Justin,1,Oregon
+2025,Justin,2,Clemson
+2025,Justin,3,Indiana
+2025,Justin,4,Georgia Tech
+2025,Justin,5,Tennessee
+2025,Justin,6,Nebraska
+2025,Matthew,1,Penn State
+2025,Matthew,2,Memphis
+2025,Matthew,3,Southern Methodist
+2025,Matthew,4,Illinois
+2025,Matthew,5,Oklahoma
+2025,Matthew,6,Miami (OH)
+2025,Futa,1,Georgia
+2025,Futa,2,Arizona State
+2025,Futa,3,South Carolina
+2025,Futa,4,Buffalo
+2025,Futa,5,Arkansas State
+2025,Futa,6,Colorado State
+2025,Ben,1,Texas
+2025,Ben,2,Nevada-Las Vegas
+2025,Ben,3,Michigan
+2025,Ben,4,Mississippi
+2025,Ben,5,Kansas
+2025,Ben,6,Texas-San Antonio
+2025,Austin,1,Toledo
+2025,Austin,2,Alabama
+2025,Austin,3,San Jose State
+2025,Austin,4,Iowa State
+2025,Austin,5,Florida
+2025,Austin,6,Baylor
+2025,Nick,1,Liberty
+2025,Nick,2,James Madison
+2025,Nick,3,BYU
+2025,Nick,4,Georgia Southern
+2025,Nick,5,Missouri
+2025,Nick,6,Southern California
+2025,Oliver,1,Boise State
+2025,Oliver,2,Tulane
+2025,Oliver,3,Texas Tech
+2025,Oliver,4,Louisville
+2025,Oliver,5,Texas A&M
+2025,Oliver,6,Ohio
+2026,Austin,1,Indiana
+2026,Austin,2,Texas A&M
+2026,Austin,3,Southern California
+2026,Austin,4,Clemson
+2026,Austin,5,Louisiana State
+2026,Austin,6,Florida State
+2026,Ben,1,Texas Tech
+2026,Ben,2,James Madison
+2026,Ben,3,Louisville
+2026,Ben,4,Nevada-Las Vegas
+2026,Ben,5,Oklahoma
+2026,Ben,6,Washington
+2026,Futa,1,Notre Dame
+2026,Futa,2,Western Michigan
+2026,Futa,3,Navy
+2026,Futa,4,Hawaii
+2026,Futa,5,Louisiana
+2026,Futa,6,Nebraska
+2026,Justin,1,Penn State
+2026,Justin,2,Texas
+2026,Justin,3,Houston
+2026,Justin,4,Mississippi
+2026,Justin,5,Old Dominion
+2026,Justin,6,UCLA
+2026,Matthew,1,Miami (FL)
+2026,Matthew,2,South Florida
+2026,Matthew,3,Boise State
+2026,Matthew,4,Texas-San Antonio
+2026,Matthew,5,Miami (OH)
+2026,Matthew,6,California
+2026,Nick,1,Oregon
+2026,Nick,2,Southern Methodist
+2026,Nick,3,Alabama
+2026,Nick,4,Tulane
+2026,Nick,5,Jacksonville State
+2026,Nick,6,San Diego State
+2026,Oliver,1,North Dakota State
+2026,Oliver,2,Liberty
+2026,Oliver,3,New Mexico
+2026,Oliver,4,Kansas State
+2026,Oliver,5,North Carolina State
+2026,Oliver,6,Illinois
+2026,Randy,1,Ohio State
+2026,Randy,2,North Texas
+2026,Randy,3,BYU
+2026,Randy,4,Virginia
+2026,Randy,5,Delaware
+2026,Randy,6,Bowling Green
+2026,Sean,1,Georgia
+2026,Sean,2,Utah
+2026,Sean,3,Michigan
+2026,Sean,4,Toledo
+2026,Sean,5,Iowa
+2026,Sean,6,East Carolina
