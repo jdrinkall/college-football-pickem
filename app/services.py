@@ -7,7 +7,7 @@ from sqlalchemy import select, delete, or_
 from sqlalchemy.orm import Session
 from .models import Base, TeamRecord, TeamPoints, GameLine
 from .db import engine, SessionLocal
-from .cfbd_client import fetch_team_records, fetch_team_games, fetch_lines
+from .cfbd_client import fetch_team_records, fetch_team_games, fetch_lines, CFBDQuotaError
 
 # Create tables on import
 Base.metadata.create_all(bind=engine)
@@ -307,6 +307,12 @@ async def refresh_lines(season: int) -> int:
 # re-attempts the fetch — with retries and backoff — and nothing ever caches.
 _lines_retry_after: Dict[int, datetime] = {}
 
+# How long to wait before trying again after a failed refresh. A spent monthly
+# quota is measured in days, so retrying it every quarter hour just fills the
+# log; anything else is usually a blip worth retrying sooner.
+_RETRY_AFTER_ERROR = _PF_TTL_SECONDS
+_RETRY_AFTER_QUOTA = int(os.getenv("CFBD_QUOTA_BACKOFF", str(6 * 60 * 60)))
+
 
 async def ensure_lines(season: int) -> None:
     """Fetch lines if we have none, or if a live season's copy has gone stale.
@@ -336,8 +342,13 @@ async def ensure_lines(season: int) -> None:
         await refresh_lines(season)
         _lines_retry_after.pop(season, None)
     except Exception as e:
-        _lines_retry_after[season] = datetime.utcnow() + timedelta(seconds=_PF_TTL_SECONDS)
-        print(f"Lines refresh failed for {season}, using stored rows: {e}")
+        quota = isinstance(e, CFBDQuotaError)
+        wait = _RETRY_AFTER_QUOTA if quota else _RETRY_AFTER_ERROR
+        _lines_retry_after[season] = datetime.utcnow() + timedelta(seconds=wait)
+        print(
+            f"Lines refresh failed for {season}, using stored rows "
+            f"(next attempt in {wait // 60}m): {e}"
+        )
 
 def american_to_decimal(moneyline: int) -> float:
     """American odds to a decimal multiplier that includes the stake.

@@ -18,6 +18,11 @@ RETRY_STATUSES = {429, 500, 502, 503, 504}
 class CFBDApiError(Exception):
     pass
 
+
+class CFBDQuotaError(CFBDApiError):
+    """The monthly call allowance is gone. Retrying before the month turns over
+    cannot succeed, so callers should back off for hours rather than minutes."""
+
 _semaphore: Optional[asyncio.Semaphore] = None
 
 def _get_semaphore() -> asyncio.Semaphore:
@@ -71,6 +76,14 @@ async def _get_list(path: str, params: dict, what: str) -> List[Dict[str, Any]]:
                 return data
 
             last_error = f"{response.status_code}: {response.text[:200]}"
+
+            # A monthly-quota 429 is not transient: it clears when the month
+            # rolls over, not on a retry. Treating it like a rate limit spends
+            # three more calls against the same exhausted quota and holds the
+            # page render open for ~8s of backoff to fail exactly the same way.
+            if response.status_code == 429 and "quota" in response.text.lower():
+                raise CFBDQuotaError(f"CFBD {what} quota exhausted - {response.text[:120]}")
+
             if response.status_code not in RETRY_STATUSES:
                 raise CFBDApiError(f"CFBD {what} error {last_error}")
 
